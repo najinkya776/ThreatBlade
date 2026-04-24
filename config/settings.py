@@ -10,6 +10,8 @@ DEFAULTS = {
     "hibp_api_key": "",
     "urlscan_api_key": "",
     "shodan_api_key": "",
+    "claude_api_key": "",
+    "openai_api_key": "",
 }
 
 

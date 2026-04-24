@@ -250,6 +250,36 @@ def ip_tools():
     return jsonify(result)
 
 
+# ── Log Analyzer ─────────────────────────────────────────────────────────────
+
+@app.route("/api/log/models", methods=["GET"])
+def log_models():
+    from modules.log_analyzer import get_models
+    return jsonify(get_models())
+
+
+@app.route("/api/log/analyze", methods=["POST"])
+def log_analyze():
+    data = request.json
+    log_text = (data.get("log_text") or "").strip()
+    provider = data.get("provider", "claude")
+    model = data.get("model", "")
+    api_key = data.get("api_key", "").strip()
+
+    # Fall back to stored key if none provided in request
+    if not api_key:
+        from config.settings import get_key
+        key_name = "claude_api_key" if provider == "claude" else "openai_api_key"
+        api_key = get_key(key_name)
+
+    if not log_text:
+        return jsonify({"error": "No log text provided."}), 400
+
+    from modules.log_analyzer import analyze_log
+    result = analyze_log(log_text, provider, model, api_key)
+    return jsonify(result)
+
+
 # ── Settings ──────────────────────────────────────────────────────────────────
 
 @app.route("/api/settings", methods=["GET"])

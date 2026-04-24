@@ -36,6 +36,9 @@
     <a class="nav-item" data-tool="ip">
       <span class="nav-icon">📡</span> IP Tools
     </a>
+    <a class="nav-item" data-tool="loganalyzer">
+      <span class="nav-icon">🤖</span> Log Analyzer <span class="nav-badge">AI</span>
+    </a>
     <a class="nav-item" data-tool="settings">
       <span class="nav-icon">⚙</span> API Keys
     </a>
@@ -225,6 +228,49 @@
       <button class="btn-primary" onclick="checkIp()">Investigate</button>
     </div>
     <div id="ip-results"></div>
+  </section>
+
+  <!-- Log Analyzer -->
+  <section class="tool-section" id="tool-loganalyzer">
+    <div class="tool-header">
+      <h2>AI Log Analyzer <span class="ai-badge">AI Powered</span></h2>
+      <p>Paste raw logs — the AI returns a severity rating, full analysis, recommendations, and automatically enriches any IOCs found.</p>
+    </div>
+
+    <div class="card">
+      <div class="form-row" style="align-items:flex-end;flex-wrap:wrap;gap:12px">
+        <div class="form-group" style="margin-bottom:0;flex:0 0 160px">
+          <label>AI Provider</label>
+          <select id="la-provider" class="input-select" onchange="onProviderChange()">
+            <option value="claude">Anthropic Claude</option>
+            <option value="openai">OpenAI</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0;flex:1;min-width:200px">
+          <label>Model</label>
+          <select id="la-model" class="input-select"></select>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-top:14px">
+        <label>API Key <span style="color:var(--muted);font-size:11px">(leave blank to use saved key from Settings)</span></label>
+        <input type="password" id="la-apikey" class="input-text" placeholder="Paste key here, or save it in Settings → API Keys" style="font-family:monospace" />
+      </div>
+
+      <div class="form-group">
+        <label>Raw Log Input</label>
+        <textarea id="la-log" class="input-textarea" rows="12"
+          placeholder="Paste raw logs here — syslog, Windows Event Log, firewall logs, IDS alerts, auth logs, web server logs, etc."></textarea>
+      </div>
+
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button class="btn-primary" onclick="analyzeLog()" id="la-btn">Analyze with AI</button>
+        <button class="btn-secondary" onclick="clearLog()">Clear</button>
+        <span id="la-status" style="font-size:12px;color:var(--muted)"></span>
+      </div>
+    </div>
+
+    <div id="la-results"></div>
   </section>
 
   <!-- Settings -->

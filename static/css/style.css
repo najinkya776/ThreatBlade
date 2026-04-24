@@ -295,6 +295,117 @@ code {
   color: var(--safe);
 }
 
+/* ── AI Badge ── */
+.ai-badge {
+  font-size: 11px;
+  font-weight: 600;
+  background: linear-gradient(135deg, rgba(230,57,70,0.2), rgba(120,80,220,0.2));
+  border: 1px solid rgba(120,80,220,0.4);
+  color: #b080ff;
+  padding: 2px 8px;
+  border-radius: 20px;
+  letter-spacing: 0.5px;
+  vertical-align: middle;
+  margin-left: 8px;
+}
+
+.nav-badge {
+  font-size: 9px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #e63946, #8040cc);
+  color: #fff;
+  padding: 1px 6px;
+  border-radius: 10px;
+  margin-left: 4px;
+  letter-spacing: 0.5px;
+  vertical-align: middle;
+}
+
+/* ── Severity ── */
+.severity-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+.sev-CRITICAL { background: rgba(230,57,70,0.2);  color: #ff4455; border: 1px solid rgba(230,57,70,0.4); }
+.sev-HIGH     { background: rgba(255,100,0,0.15); color: #ff6400; border: 1px solid rgba(255,100,0,0.3); }
+.sev-MEDIUM   { background: rgba(255,159,28,0.15);color: var(--warn); border: 1px solid rgba(255,159,28,0.3); }
+.sev-LOW      { background: rgba(46,196,182,0.1); color: var(--safe); border: 1px solid rgba(46,196,182,0.3); }
+.sev-INFO     { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+
+/* ── Analysis text ── */
+.analysis-text {
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── Recommendations list ── */
+.rec-list { list-style: none; padding: 0; }
+.rec-list li {
+  padding: 8px 0 8px 28px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  position: relative;
+  line-height: 1.6;
+}
+.rec-list li:last-child { border-bottom: none; }
+.rec-list li::before {
+  content: counter(rec);
+  counter-increment: rec;
+  position: absolute;
+  left: 0;
+  top: 8px;
+  background: var(--accent);
+  color: #fff;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 18px;
+  text-align: center;
+}
+.rec-list { counter-reset: rec; }
+
+/* ── IOC enrichment ── */
+.ioc-enrichment-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  margin: 6px 0;
+}
+.ioc-enrichment-label {
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--warn);
+  margin-bottom: 6px;
+  word-break: break-all;
+}
+
+/* ── MITRE tags ── */
+.mitre-tag {
+  display: inline-block;
+  background: rgba(120,80,220,0.15);
+  border: 1px solid rgba(120,80,220,0.3);
+  color: #b080ff;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  margin: 2px;
+}
+
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
