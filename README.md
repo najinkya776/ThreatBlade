@@ -26,6 +26,12 @@
 
 ---
 
+<div align="center">
+  <img src="docs/ThreatBlade.png" alt="ThreatBlade" width="100%"/>
+</div>
+
+---
+
 ## What is ThreatBlade?
 
 ThreatBlade is an open-source SOC (Security Operations Center) analyst toolkit that automates the repetitive investigation tasks analysts face every day — reputation lookups, URL decoding, email triage, breach checks, and more.
