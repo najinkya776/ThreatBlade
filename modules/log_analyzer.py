@@ -39,6 +39,9 @@ Analyze the provided raw log data and respond ONLY with a valid JSON object in t
 
 Only include IOCs that appear suspicious or relevant to the incident. Private/internal IPs (10.x, 192.168.x, 172.16-31.x) should only be included if they show signs of compromise."""
 
+# Models that support adaptive thinking
+_THINKING_MODELS = {"claude-opus-4-7", "claude-sonnet-4-6"}
+
 
 def _extract_iocs_regex(text):
     """Fallback regex IOC extraction directly from log text."""
@@ -61,28 +64,61 @@ def _extract_iocs_regex(text):
             "hashes": hashes[:10], "emails": emails[:10]}
 
 
-def _call_claude(log_text, model, api_key):
-    headers = {
-        "x-api-key": api_key,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-    }
-    body = {
+def stream_claude(log_text, model, api_key):
+    """Generator yielding (event_type, content) tuples.
+
+    Uses the official Anthropic SDK with:
+    - Prompt caching on the system prompt (saves cost/latency on repeated calls)
+    - Adaptive thinking for Opus 4.7 and Sonnet 4.6 (deeper reasoning)
+    - Streaming so tokens appear in the UI in real time
+    """
+    import anthropic
+    client = anthropic.Anthropic(api_key=api_key)
+
+    # Prompt caching: mark the stable system prompt as cacheable
+    system = [
+        {
+            "type": "text",
+            "text": SYSTEM_PROMPT,
+            "cache_control": {"type": "ephemeral"},
+        }
+    ]
+
+    kwargs = {
         "model": model,
-        "max_tokens": 4096,
-        "system": SYSTEM_PROMPT,
+        "max_tokens": 8000,
+        "system": system,
         "messages": [{"role": "user", "content": f"Analyze this log:\n\n{log_text}"}],
     }
-    r = requests.post("https://api.anthropic.com/v1/messages", headers=headers,
-                      json=body, timeout=60)
-    if r.status_code == 200:
-        return r.json()["content"][0]["text"]
-    elif r.status_code == 401:
-        raise ValueError("Invalid Claude API key.")
-    elif r.status_code == 429:
-        raise ValueError("Claude rate limit hit. Try again shortly.")
-    else:
-        raise ValueError(f"Claude API error {r.status_code}: {r.text[:200]}")
+
+    # Adaptive thinking: deeper analysis for supported models
+    if model in _THINKING_MODELS:
+        kwargs["thinking"] = {"type": "adaptive"}
+
+    full_text = ""
+    try:
+        with client.messages.stream(**kwargs) as stream:
+            for text in stream.text_stream:
+                full_text += text
+                yield ("token", text)
+        yield ("done", full_text)
+    except anthropic.AuthenticationError:
+        yield ("error", "Invalid Claude API key.")
+    except anthropic.RateLimitError:
+        yield ("error", "Claude rate limit hit. Try again shortly.")
+    except anthropic.APIError as e:
+        yield ("error", f"Claude API error: {e}")
+
+
+def _call_claude(log_text, model, api_key):
+    """Synchronous Claude call (used by CLI path and non-streaming fallback)."""
+    full_text = ""
+    for event_type, content in stream_claude(log_text, model, api_key):
+        if event_type == "token":
+            full_text += content
+        elif event_type == "error":
+            raise ValueError(content)
+    return full_text
 
 
 def _call_openai(log_text, model, api_key):
@@ -114,14 +150,12 @@ def _call_openai(log_text, model, api_key):
 def _parse_ai_response(raw):
     """Parse JSON from AI response, stripping any markdown code fences."""
     raw = raw.strip()
-    # Strip markdown code fences if present
     if raw.startswith("```"):
         raw = re.sub(r"^```(?:json)?\s*", "", raw)
         raw = re.sub(r"\s*```$", "", raw)
     try:
         return json.loads(raw)
     except json.JSONDecodeError:
-        # Try to extract JSON object from within the response
         match = re.search(r'\{[\s\S]*\}', raw)
         if match:
             try:
@@ -166,8 +200,31 @@ def _enrich_iocs(iocs):
     return enrichment
 
 
+def _build_final_result(raw_text, log_text, provider, model):
+    """Parse AI text, merge regex IOCs, enrich, and return final result dict."""
+    result = _parse_ai_response(raw_text)
+
+    if result.get("parse_error"):
+        result["iocs_found"] = _extract_iocs_regex(log_text)
+    else:
+        ai_iocs = result.get("iocs_found", {})
+        regex_iocs = _extract_iocs_regex(log_text)
+        for key in ("ips", "urls", "domains", "hashes", "emails"):
+            merged = list(set(ai_iocs.get(key, []) + regex_iocs.get(key, [])))
+            ai_iocs[key] = merged
+        result["iocs_found"] = ai_iocs
+
+    iocs = result.get("iocs_found", {})
+    if any(iocs.get(k) for k in ("ips", "urls", "domains", "hashes")):
+        result["enrichment"] = _enrich_iocs(iocs)
+
+    result["provider"] = provider
+    result["model"] = model
+    return result
+
+
 def analyze_log(log_text, provider, model, api_key):
-    """Main entry: send log to AI, parse result, enrich IOCs."""
+    """Main entry for CLI: send log to AI, parse result, enrich IOCs."""
     if not log_text.strip():
         return {"error": "No log data provided."}
     if not api_key:
@@ -185,29 +242,7 @@ def analyze_log(log_text, provider, model, api_key):
     except requests.RequestException as e:
         return {"error": f"Network error: {e}"}
 
-    result = _parse_ai_response(raw)
-
-    if result.get("parse_error"):
-        # AI gave non-JSON — still useful, extract IOCs via regex
-        result["iocs_found"] = _extract_iocs_regex(log_text)
-    else:
-        # Merge AI-found IOCs with regex-found ones (deduplicated)
-        ai_iocs = result.get("iocs_found", {})
-        regex_iocs = _extract_iocs_regex(log_text)
-        for key in ("ips", "urls", "domains", "hashes", "emails"):
-            merged = list(set(ai_iocs.get(key, []) + regex_iocs.get(key, [])))
-            ai_iocs[key] = merged
-        result["iocs_found"] = ai_iocs
-
-    # Enrich IOCs if any were found
-    iocs = result.get("iocs_found", {})
-    has_iocs = any(iocs.get(k) for k in ("ips", "urls", "domains", "hashes"))
-    if has_iocs:
-        result["enrichment"] = _enrich_iocs(iocs)
-
-    result["provider"] = provider
-    result["model"] = model
-    return result
+    return _build_final_result(raw, log_text, provider, model)
 
 
 def get_models():

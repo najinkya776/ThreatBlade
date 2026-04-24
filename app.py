@@ -1,7 +1,8 @@
 import os
+import json
 import hashlib
 import tempfile
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, Response, stream_with_context
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB upload limit
@@ -266,7 +267,6 @@ def log_analyze():
     model = data.get("model", "")
     api_key = data.get("api_key", "").strip()
 
-    # Fall back to stored key if none provided in request
     if not api_key:
         from config.settings import get_key
         key_name = "claude_api_key" if provider == "claude" else "openai_api_key"
@@ -278,6 +278,64 @@ def log_analyze():
     from modules.log_analyzer import analyze_log
     result = analyze_log(log_text, provider, model, api_key)
     return jsonify(result)
+
+
+@app.route("/api/log/stream", methods=["POST"])
+def log_stream():
+    """SSE endpoint — streams Claude tokens in real time, sends final parsed result."""
+    data = request.json
+    log_text = (data.get("log_text") or "").strip()
+    provider = data.get("provider", "claude")
+    model = data.get("model", "")
+    api_key = (data.get("api_key") or "").strip()
+
+    if not api_key:
+        from config.settings import get_key
+        key_name = "claude_api_key" if provider == "claude" else "openai_api_key"
+        api_key = get_key(key_name)
+
+    if not log_text:
+        def _err():
+            yield f"data: {json.dumps({'type': 'error', 'message': 'No log text provided.'})}\n\n"
+        return Response(stream_with_context(_err()), mimetype="text/event-stream")
+
+    if not api_key:
+        def _err():
+            yield f"data: {json.dumps({'type': 'error', 'message': f'No API key configured for {provider}.'})}\n\n"
+        return Response(stream_with_context(_err()), mimetype="text/event-stream")
+
+    def generate():
+        from modules.log_analyzer import stream_claude, _call_openai, _build_final_result
+
+        if provider == "claude":
+            try:
+                full_text = ""
+                for event_type, content in stream_claude(log_text, model, api_key):
+                    if event_type == "token":
+                        full_text += content
+                        yield f"data: {json.dumps({'type': 'token', 'content': content})}\n\n"
+                    elif event_type == "done":
+                        yield f"data: {json.dumps({'type': 'enriching'})}\n\n"
+                        result = _build_final_result(full_text, log_text, provider, model)
+                        yield f"data: {json.dumps({'type': 'done', 'result': result})}\n\n"
+                    elif event_type == "error":
+                        yield f"data: {json.dumps({'type': 'error', 'message': content})}\n\n"
+            except Exception as e:
+                yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+        elif provider == "openai":
+            try:
+                raw = _call_openai(log_text, model, api_key)
+                result = _build_final_result(raw, log_text, provider, model)
+                yield f"data: {json.dumps({'type': 'done', 'result': result})}\n\n"
+            except Exception as e:
+                yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 # ── Settings ──────────────────────────────────────────────────────────────────

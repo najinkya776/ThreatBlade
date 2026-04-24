@@ -515,18 +515,66 @@ async function analyzeLog() {
 
   btn.disabled = true;
   btn.textContent = 'Analyzing…';
-  status.textContent = 'Sending to AI — this may take 15-30 seconds…';
-  loading(el);
+  status.textContent = provider === 'claude' ? 'AI is thinking…' : 'Sending to AI…';
+
+  // Live stream panel — shows tokens as they arrive
+  el.innerHTML = `<div class="result-card" id="la-stream-card">
+    <div class="result-title">AI Analysis <span class="spinner" style="width:12px;height:12px;border-width:1.5px"></span></div>
+    <pre class="analysis-text" id="la-stream-text" style="min-height:48px;opacity:0.85"></pre>
+  </div>`;
+
+  const streamText = document.getElementById('la-stream-text');
+  let buffer = '';
 
   try {
-    const data = await post('/api/log/analyze', {log_text, provider, model, api_key});
-    renderLogResults(el, data);
+    const response = await fetch('/api/log/stream', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({log_text, provider, model, api_key})
+    });
+
+    if (!response.ok) {
+      err(el, `Server error ${response.status}`);
+      return;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let sseBuffer = '';
+
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+
+      sseBuffer += decoder.decode(value, {stream: true});
+      const lines = sseBuffer.split('\n\n');
+      sseBuffer = lines.pop(); // hold incomplete trailing chunk
+
+      for (const chunk of lines) {
+        if (!chunk.startsWith('data: ')) continue;
+        let payload;
+        try { payload = JSON.parse(chunk.slice(6)); } catch { continue; }
+
+        if (payload.type === 'token') {
+          buffer += payload.content;
+          streamText.textContent = buffer;
+        } else if (payload.type === 'enriching') {
+          status.textContent = 'Enriching IOCs…';
+        } else if (payload.type === 'done') {
+          status.textContent = '';
+          renderLogResults(el, payload.result);
+        } else if (payload.type === 'error') {
+          err(el, payload.message);
+          status.textContent = '';
+        }
+      }
+    }
   } catch(e) {
-    err(el, 'Request failed: ' + e.message);
+    err(el, 'Stream error: ' + e.message);
+    status.textContent = '';
   } finally {
     btn.disabled = false;
     btn.textContent = 'Analyze with AI';
-    status.textContent = '';
   }
 }
 
