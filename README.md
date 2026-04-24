@@ -180,5 +180,5 @@ MIT — see [LICENSE](LICENSE) for details.
 ---
 
 <div align="center">
-Built for the blue team. Made with Python.
+Built for the blue team by <a href="https://github.com/najinkya776">Ajinkya Kadam</a>. Made with Python.
 </div>
