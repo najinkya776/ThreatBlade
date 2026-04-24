@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check all modules import cleanly
+        run: |
+          python -c "
+          from modules.reputation import reputation_menu, check_virustotal_data, check_abuseipdb_data
+          from modules.url_tools import url_menu, sanitize_url, desanitize_url, decode_proofpoint, decode_safelinks
+          from modules.dns_tools import dns_menu, dns_lookup_data, whois_lookup_data
+          from modules.hash_tools import hash_menu, hash_string_data, check_hash_virustotal_data
+          from modules.email_analyzer import email_menu
+          from modules.breach_check import breach_menu, check_hibp_email_data
+          from modules.ip_tools import ip_menu, geoip_lookup_data
+          from modules.templates import template_menu
+          from config.settings import load_config
+          print('All modules OK')
+          "
+
+      - name: Test Flask app starts
+        run: |
+          python -c "
+          from app import app
+          client = app.test_client()
+          assert client.get('/').status_code == 200
+          import json
+          r = client.post('/api/url', json={'action':'sanitize','url':'http://evil.com/test'})
+          assert json.loads(r.data)['result'] == 'hxxp://evil[.]com/test'
+          r2 = client.post('/api/hash/text', json={'text':'threatblade'})
+          d = json.loads(r2.data)
+          assert 'md5' in d and 'sha1' in d and 'sha256' in d
+          print('Flask routes OK')
+          "
+
+      - name: Test URL tool functions
+        run: |
+          python -c "
+          from modules.url_tools import sanitize_url, desanitize_url, extract_urls
+          assert '[.]' in sanitize_url('http://example.com')
+          assert 'http' in desanitize_url('hxxp://example[.]com')
+          urls = extract_urls('visit http://malware.com/payload and https://phish.net/login')
+          assert len(urls) == 2
+          print('URL tools OK')
+          "
