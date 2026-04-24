@@ -38,6 +38,7 @@ Available as both a **web app** and a **CLI tool**. No cloud dependency, runs en
 
 | Module | Description | APIs Used |
 |---|---|---|
+| **🤖 AI Log Analyzer** | Paste raw logs — AI returns severity, full analysis, MITRE ATT&CK mapping, recommendations + auto IOC enrichment | Claude / OpenAI |
 | **Reputation Check** | Scan IPs, domains, URLs, and file hashes for malicious activity | VirusTotal, AbuseIPDB |
 | **URL Tools** | Defang/refang, decode ProofPoint & SafeLinks, expand short URLs, extract URLs from text | — |
 | **DNS & WHOIS** | Full DNS record lookup (A/MX/TXT/NS/CNAME/SOA), WHOIS, reverse DNS | — |
@@ -88,6 +89,8 @@ For full functionality, add optional keys via the **Settings** page in the web a
 
 | Service | Required For | Get Key |
 |---|---|---|
+| [Anthropic Claude](https://console.anthropic.com) | AI Log Analyzer (Claude models) | Free credits on signup |
+| [OpenAI](https://platform.openai.com/api-keys) | AI Log Analyzer (GPT models) | Pay-as-you-go |
 | [VirusTotal](https://www.virustotal.com/gui/my-apikey) | Reputation checks, hash lookup | Free tier available |
 | [AbuseIPDB](https://www.abuseipdb.com/account/api) | IP abuse score | Free tier available |
 | [HaveIBeenPwned](https://haveibeenpwned.com/API/Key) | Breach / credential checks | ~$3.50/month |
@@ -135,13 +138,14 @@ threatBlade > 9    # Settings
 
 ```
 ThreatBlade/
-├── app.py                  # Flask web application
+├── app.py                  # Flask web application + all API routes
 ├── threatblade.py          # CLI entry point
 ├── requirements.txt
 ├── config/
 │   ├── settings.py         # API key management
 │   └── keys.json.example   # Template — copy to keys.json and fill in
 ├── modules/
+│   ├── log_analyzer.py     # AI log analysis (Claude + OpenAI) + IOC enrichment
 │   ├── reputation.py       # VirusTotal + AbuseIPDB
 │   ├── url_tools.py        # URL decode / sanitize
 │   ├── dns_tools.py        # DNS + WHOIS
@@ -163,7 +167,7 @@ ThreatBlade/
 
 Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-Ideas for new modules: Shodan lookup, URLScan.io submission, MITRE ATT&CK mapping, Sigma rule generator.
+Ideas for new modules: Shodan lookup, URLScan.io submission, Sigma rule generator, threat feed integration.
 
 ---
 
