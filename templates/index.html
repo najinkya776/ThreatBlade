@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>threatBlade — SOC Toolkit</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="sidebar-brand">
+    <span class="brand-icon">⚔</span>
+    <span class="brand-name">threat<span class="brand-accent">Blade</span></span>
+  </div>
+  <nav class="sidebar-nav">
+    <a class="nav-item active" data-tool="reputation">
+      <span class="nav-icon">🔍</span> Reputation
+    </a>
+    <a class="nav-item" data-tool="url">
+      <span class="nav-icon">🔗</span> URL Tools
+    </a>
+    <a class="nav-item" data-tool="dns">
+      <span class="nav-icon">🌐</span> DNS & WHOIS
+    </a>
+    <a class="nav-item" data-tool="hash">
+      <span class="nav-icon">🔐</span> Hash Tools
+    </a>
+    <a class="nav-item" data-tool="email">
+      <span class="nav-icon">📧</span> Email Analyzer
+    </a>
+    <a class="nav-item" data-tool="breach">
+      <span class="nav-icon">🚨</span> Breach Check
+    </a>
+    <a class="nav-item" data-tool="ip">
+      <span class="nav-icon">📡</span> IP Tools
+    </a>
+    <a class="nav-item" data-tool="settings">
+      <span class="nav-icon">⚙</span> API Keys
+    </a>
+  </nav>
+  <div class="sidebar-footer">v1.0 · Open Source</div>
+</aside>
+
+<!-- Main -->
+<main class="main">
+
+  <!-- Reputation -->
+  <section class="tool-section active" id="tool-reputation">
+    <div class="tool-header">
+      <h2>Reputation Check</h2>
+      <p>Check IPs, domains, URLs, and file hashes against VirusTotal and AbuseIPDB.</p>
+    </div>
+    <div class="card">
+      <div class="form-row">
+        <select id="rep-type" class="input-select">
+          <option value="ip">IP Address</option>
+          <option value="domain">Domain</option>
+          <option value="url">URL</option>
+          <option value="hash">File Hash</option>
+        </select>
+        <input type="text" id="rep-ioc" class="input-text" placeholder="Enter IP, domain, URL or hash…" />
+        <button class="btn-primary" onclick="checkReputation()">Scan</button>
+      </div>
+    </div>
+    <div id="rep-results"></div>
+  </section>
+
+  <!-- URL Tools -->
+  <section class="tool-section" id="tool-url">
+    <div class="tool-header">
+      <h2>URL Tools</h2>
+      <p>Defang, refang, decode ProofPoint / SafeLinks / Base64, expand short URLs.</p>
+    </div>
+    <div class="card">
+      <div class="form-group">
+        <label>Action</label>
+        <select id="url-action" class="input-select" onchange="toggleUrlTextarea()">
+          <option value="sanitize">Sanitize (defang)</option>
+          <option value="desanitize">Desanitize (refang)</option>
+          <option value="proofpoint">Decode ProofPoint</option>
+          <option value="safelinks">Decode SafeLinks</option>
+          <option value="base64">Decode Base64 URL</option>
+          <option value="expand">Expand Short URL</option>
+          <option value="extract">Extract URLs from text</option>
+        </select>
+      </div>
+      <div id="url-single-input" class="form-group">
+        <label>URL / Encoded String</label>
+        <input type="text" id="url-value" class="input-text" placeholder="Paste URL here…" />
+      </div>
+      <div id="url-text-input" class="form-group" style="display:none">
+        <label>Paste text block</label>
+        <textarea id="url-text" class="input-textarea" rows="5" placeholder="Paste email body, log snippet…"></textarea>
+      </div>
+      <button class="btn-primary" onclick="runUrlTool()">Run</button>
+    </div>
+    <div id="url-results"></div>
+  </section>
+
+  <!-- DNS & WHOIS -->
+  <section class="tool-section" id="tool-dns">
+    <div class="tool-header">
+      <h2>DNS & WHOIS</h2>
+      <p>Resolve DNS records, run WHOIS lookups, and reverse-resolve IPs.</p>
+    </div>
+    <div class="card">
+      <div class="form-row">
+        <select id="dns-type" class="input-select">
+          <option value="dns">DNS Lookup</option>
+          <option value="whois">WHOIS</option>
+          <option value="reverse">Reverse DNS (PTR)</option>
+        </select>
+        <input type="text" id="dns-target" class="input-text" placeholder="Domain or IP address…" />
+        <button class="btn-primary" onclick="runDns()">Lookup</button>
+      </div>
+    </div>
+    <div id="dns-results"></div>
+  </section>
+
+  <!-- Hash Tools -->
+  <section class="tool-section" id="tool-hash">
+    <div class="tool-header">
+      <h2>Hash Tools</h2>
+      <p>Hash strings or files, and check hashes against VirusTotal.</p>
+    </div>
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('hash', 'string', this)">Hash String</button>
+      <button class="tab" onclick="switchTab('hash', 'file', this)">Hash File</button>
+      <button class="tab" onclick="switchTab('hash', 'check', this)">Check Hash (VT)</button>
+    </div>
+    <div class="card" id="hash-tab-string">
+      <div class="form-group">
+        <label>String to hash</label>
+        <input type="text" id="hash-string" class="input-text" placeholder="Enter any string…" />
+      </div>
+      <button class="btn-primary" onclick="hashString()">Hash It</button>
+    </div>
+    <div class="card" id="hash-tab-file" style="display:none">
+      <div class="form-group">
+        <label>Upload file</label>
+        <input type="file" id="hash-file" class="input-file" />
+      </div>
+      <label class="checkbox-label">
+        <input type="checkbox" id="hash-vt-check" /> Also check SHA256 on VirusTotal
+      </label>
+      <button class="btn-primary" onclick="hashFile()">Hash File</button>
+    </div>
+    <div class="card" id="hash-tab-check" style="display:none">
+      <div class="form-group">
+        <label>Hash (MD5 / SHA1 / SHA256)</label>
+        <input type="text" id="hash-vt" class="input-text" placeholder="Paste hash…" />
+      </div>
+      <button class="btn-primary" onclick="checkHash()">Check on VT</button>
+    </div>
+    <div id="hash-results"></div>
+  </section>
+
+  <!-- Email Analyzer -->
+  <section class="tool-section" id="tool-email">
+    <div class="tool-header">
+      <h2>Email Analyzer</h2>
+      <p>Upload a .eml file to extract headers, IOCs, auth results and phishing indicators.</p>
+    </div>
+    <div class="card">
+      <div class="form-group">
+        <label>Upload .eml file</label>
+        <input type="file" id="email-file" class="input-file" accept=".eml,.msg" />
+      </div>
+      <button class="btn-primary" onclick="analyzeEmail()">Analyze</button>
+    </div>
+    <div id="email-results"></div>
+  </section>
+
+  <!-- Breach Check -->
+  <section class="tool-section" id="tool-breach">
+    <div class="tool-header">
+      <h2>Breach Check</h2>
+      <p>Check emails, domains, and passwords against HaveIBeenPwned.</p>
+    </div>
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('breach', 'email', this)">Email</button>
+      <button class="tab" onclick="switchTab('breach', 'domain', this)">Domain</button>
+      <button class="tab" onclick="switchTab('breach', 'password', this)">Password</button>
+    </div>
+    <div class="card" id="breach-tab-email">
+      <div class="form-row">
+        <input type="text" id="breach-email" class="input-text" placeholder="user@example.com" />
+        <button class="btn-primary" onclick="checkBreachEmail()">Check</button>
+      </div>
+    </div>
+    <div class="card" id="breach-tab-domain" style="display:none">
+      <div class="form-row">
+        <input type="text" id="breach-domain" class="input-text" placeholder="example.com" />
+        <button class="btn-primary" onclick="checkBreachDomain()">Check</button>
+      </div>
+    </div>
+    <div class="card" id="breach-tab-password" style="display:none">
+      <div class="form-group">
+        <label>Password (checked via k-anonymity — never sent in full)</label>
+        <input type="password" id="breach-password" class="input-text" placeholder="Enter password…" />
+      </div>
+      <button class="btn-primary" onclick="checkBreachPassword()">Check</button>
+    </div>
+    <div id="breach-results"></div>
+  </section>
+
+  <!-- IP Tools -->
+  <section class="tool-section" id="tool-ip">
+    <div class="tool-header">
+      <h2>IP Tools</h2>
+      <p>GeoIP, Tor exit node check, and DNSBL blacklist verification.</p>
+    </div>
+    <div class="card">
+      <div class="form-group">
+        <label>IP Address</label>
+        <input type="text" id="ip-value" class="input-text" placeholder="1.2.3.4" />
+      </div>
+      <div class="checkbox-group">
+        <label class="checkbox-label"><input type="checkbox" id="ip-geo" checked /> GeoIP</label>
+        <label class="checkbox-label"><input type="checkbox" id="ip-tor" checked /> Tor Exit Check</label>
+        <label class="checkbox-label"><input type="checkbox" id="ip-dnsbl" checked /> DNSBL Blacklists</label>
+      </div>
+      <button class="btn-primary" onclick="checkIp()">Investigate</button>
+    </div>
+    <div id="ip-results"></div>
+  </section>
+
+  <!-- Settings -->
+  <section class="tool-section" id="tool-settings">
+    <div class="tool-header">
+      <h2>API Keys</h2>
+      <p>Keys are stored locally in <code>config/keys.json</code> and never committed to git.</p>
+    </div>
+    <div class="card" id="settings-form">
+      <p class="loading-text">Loading…</p>
+    </div>
+  </section>
+
+</main>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>

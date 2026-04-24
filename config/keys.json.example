@@ -1,0 +1,7 @@
+{
+    "virustotal_api_key": "YOUR_VIRUSTOTAL_API_KEY",
+    "abuseipdb_api_key": "YOUR_ABUSEIPDB_API_KEY",
+    "hibp_api_key": "YOUR_HIBP_API_KEY",
+    "urlscan_api_key": "YOUR_URLSCAN_API_KEY",
+    "shodan_api_key": "YOUR_SHODAN_API_KEY"
+}
