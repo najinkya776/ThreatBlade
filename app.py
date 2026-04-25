@@ -58,7 +58,7 @@ def url_tools():
         r = decode_base64_url(url)
         return jsonify({"result": r} if r else {"error": "Could not decode as URL."})
     elif action == "expand":
-        return jsonify({"result": expand_short_url(url)})
+        return jsonify(expand_short_url(url, enrich=data.get("enrich", False)))
     elif action == "extract":
         urls = extract_urls(text)
         return jsonify({"urls": urls, "count": len(urls)})

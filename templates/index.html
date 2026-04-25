@@ -97,6 +97,12 @@
         <label>Paste text block</label>
         <textarea id="url-text" class="input-textarea" rows="5" placeholder="Paste email body, log snippet…"></textarea>
       </div>
+      <div id="url-enrich-option" class="form-group" style="display:none">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="url-enrich" />
+          Enrich domains (WHOIS · IP · VirusTotal)
+        </label>
+      </div>
       <button class="btn-primary" onclick="runUrlTool()">Run</button>
     </div>
     <div id="url-results"></div>

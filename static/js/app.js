@@ -131,8 +131,10 @@ function toggleUrlTextarea() {
   const action = document.getElementById('url-action').value;
   const single = document.getElementById('url-single-input');
   const textarea = document.getElementById('url-text-input');
+  const enrichOpt = document.getElementById('url-enrich-option');
   if (action === 'extract') { single.style.display = 'none'; textarea.style.display = ''; }
   else { single.style.display = ''; textarea.style.display = 'none'; }
+  enrichOpt.style.display = action === 'expand' ? '' : 'none';
 }
 
 async function runUrlTool() {
@@ -142,7 +144,8 @@ async function runUrlTool() {
   const text = document.getElementById('url-text').value;
   loading(el);
 
-  const body = action === 'extract' ? {action, text} : {action, url};
+  const enrich = action === 'expand' && document.getElementById('url-enrich').checked;
+  const body = action === 'extract' ? {action, text} : action === 'expand' ? {action, url, enrich} : {action, url};
   const data = await post('/api/url', body);
 
   if (data.error) { err(el, data.error); return; }
@@ -154,6 +157,49 @@ async function runUrlTool() {
     let html = `<div class="result-card"><div class="result-title">Extracted URLs (${data.count})</div>`;
     data.urls.forEach(u => { html += `<div class="result-row"><code>${esc(u)}</code></div>`; });
     html += '</div>';
+    el.innerHTML = html;
+  } else if (action === 'expand') {
+    let html = `<div class="result-card"><div class="result-title">Redirect Chain</div>`;
+    if (data.count === 0) {
+      html += row('No redirects', `<code>${esc(data.final)}</code>`);
+    } else {
+      data.hops.forEach((hop, i) => {
+        const loc = hop.location ? `<br><span style="opacity:.6;font-size:.85em">Location: ${esc(hop.location)}</span>` : '';
+        html += `<div class="result-row"><span class="result-label">Hop ${i + 1}</span><span class="result-value"><code>${esc(hop.url)}</code> ${badge(String(hop.status_code), hop.status_code < 400 ? 'neutral' : 'danger')}${loc}</span></div>`;
+      });
+      html += `<div class="result-row"><span class="result-label" style="color:var(--accent)">Final</span><span class="result-value"><code>${esc(data.final)}</code></span></div>`;
+    }
+    html += '</div>';
+
+    const f = data.flags || {};
+    const flagItems = [];
+    if (f.too_many_redirects) flagItems.push(`<span class="tag" style="background:var(--danger)">Too many redirects (&gt;5)</span>`);
+    if (f.https_downgrade) flagItems.push(`<span class="tag" style="background:var(--danger)">HTTPS→HTTP downgrade</span>`);
+    (f.known_shorteners || []).forEach(s => flagItems.push(`<span class="tag" style="background:var(--warn)">Shortener: ${esc(s)}</span>`));
+    if (flagItems.length) {
+      html += `<div class="result-card"><div class="result-title">Flags</div><div class="result-row"><div class="tag-list">${flagItems.join('')}</div></div></div>`;
+    }
+
+    if (data.enrichment) {
+      html += `<div class="result-card"><div class="result-title">Domain Enrichment</div>`;
+      Object.entries(data.enrichment).forEach(([domain, info]) => {
+        html += `<div class="result-row" style="flex-direction:column;align-items:flex-start;gap:4px">`;
+        html += `<strong>${esc(domain)}</strong>`;
+        html += `<span>IP: <code>${esc(info.ip || 'N/A')}</code></span>`;
+        const w = info.whois || {};
+        if (w.registrar) html += `<span>Registrar: ${esc(w.registrar)}</span>`;
+        if (w.creation_date) html += `<span>Created: ${esc(w.creation_date)}</span>`;
+        if (w.country) html += `<span>Country: ${esc(w.country)}</span>`;
+        const vt = info.virustotal || {};
+        if (vt.total != null) {
+          const vtBadge = badge(`${vt.malicious}/${vt.total}`, vt.malicious > 0 ? 'danger' : 'safe');
+          html += `<span>VirusTotal: ${vtBadge}</span>`;
+        }
+        html += `</div>`;
+      });
+      html += '</div>';
+    }
+
     el.innerHTML = html;
   } else {
     el.innerHTML = `<div class="result-card">

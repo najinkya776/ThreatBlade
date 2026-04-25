@@ -46,7 +46,7 @@ Available as both a **web app** and a **CLI tool**. No cloud dependency, runs en
 |---|---|---|
 | **🤖 AI Log Analyzer** | Paste raw logs — AI returns severity, full analysis, MITRE ATT&CK mapping, recommendations + auto IOC enrichment | Claude / OpenAI |
 | **Reputation Check** | Scan IPs, domains, URLs, and file hashes for malicious activity | VirusTotal, AbuseIPDB |
-| **URL Tools** | Defang/refang, decode ProofPoint & SafeLinks, expand short URLs, extract URLs from text | — |
+| **URL Tools** | Defang/refang, decode ProofPoint & SafeLinks, expand short URLs with full redirect chain (status codes, Location headers, suspicious flags), optional domain enrichment (WHOIS · IP · VirusTotal), extract URLs from text | — |
 | **DNS & WHOIS** | Full DNS record lookup (A/MX/TXT/NS/CNAME/SOA), WHOIS, reverse DNS | — |
 | **Hash Tools** | MD5/SHA1/SHA256 file & string hashing with VirusTotal hash reputation | VirusTotal |
 | **Email Analyzer** | Parse `.eml` files — extract IOCs, check SPF/DKIM, detect phishing indicators | — |

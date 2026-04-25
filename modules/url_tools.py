@@ -1,8 +1,16 @@
 import re
 import base64
+import socket
 import urllib.parse
 import requests
 from colorama import Fore, Style
+
+KNOWN_SHORTENERS = {
+    "bit.ly", "bitly.com", "t.co", "tinyurl.com", "goo.gl", "ow.ly",
+    "buff.ly", "dlvr.it", "ift.tt", "fb.me", "j.mp", "rebrand.ly",
+    "cutt.ly", "tiny.cc", "is.gd", "v.gd", "short.io", "linktr.ee",
+    "shorte.st", "adf.ly",
+}
 
 
 def sanitize_url(url):
@@ -59,15 +67,68 @@ def decode_base64_url(encoded):
     return None
 
 
-def expand_short_url(url):
-    """Follow redirects to find the final destination URL."""
+def _extract_domain(url):
     try:
-        r = requests.head(url, allow_redirects=True, timeout=10)
-        if r.url != url:
-            return r.url
-        return url
+        netloc = urllib.parse.urlparse(url).netloc.split(":")[0]
+        return netloc[4:] if netloc.startswith("www.") else netloc
+    except Exception:
+        return None
+
+
+def _enrich_domain(domain):
+    result = {}
+    try:
+        result["ip"] = socket.gethostbyname(domain)
+    except Exception:
+        result["ip"] = None
+    try:
+        from modules.dns_tools import whois_lookup_data
+        result["whois"] = whois_lookup_data(domain)
+    except Exception:
+        result["whois"] = None
+    try:
+        from modules.reputation import check_virustotal_data
+        result["virustotal"] = check_virustotal_data(domain, "domain")
+    except Exception:
+        pass
+    return result
+
+
+def expand_short_url(url, enrich=False):
+    """Follow redirects and return the full chain with status codes, headers, and analysis."""
+    try:
+        with requests.get(url, allow_redirects=True, timeout=10, stream=True) as r:
+            hops = [
+                {
+                    "url": resp.url,
+                    "status_code": resp.status_code,
+                    "location": resp.headers.get("Location"),
+                }
+                for resp in r.history
+            ]
+            final = r.url
+
+        all_urls = [h["url"] for h in hops] + [final]
+        flags = {
+            "too_many_redirects": len(hops) > 5,
+            "https_downgrade": any(
+                all_urls[i].startswith("https://") and all_urls[i + 1].startswith("http://")
+                for i in range(len(all_urls) - 1)
+            ),
+            "known_shorteners": sorted({
+                _extract_domain(u) for u in all_urls if _extract_domain(u) in KNOWN_SHORTENERS
+            }),
+        }
+
+        result = {"hops": hops, "final": final, "count": len(hops), "flags": flags}
+
+        if enrich:
+            unique_domains = sorted({_extract_domain(u) for u in all_urls if _extract_domain(u)})
+            result["enrichment"] = {d: _enrich_domain(d) for d in unique_domains}
+
+        return result
     except requests.RequestException as e:
-        return f"Error: {e}"
+        return {"error": str(e)}
 
 
 def extract_urls(text):
@@ -119,9 +180,40 @@ def url_menu():
             print(f"{Fore.YELLOW}[!] Could not decode as URL.{Style.RESET_ALL}")
     elif choice == "6":
         url = input("Enter shortened URL: ").strip()
+        enrich = input("Include domain enrichment? (WHOIS + IP + VT) [y/N]: ").strip().lower() == "y"
         print(f"{Fore.CYAN}[*] Following redirects...{Style.RESET_ALL}")
-        result = expand_short_url(url)
-        print(f"\n{Fore.GREEN}[+] Final destination: {result}{Style.RESET_ALL}")
+        result = expand_short_url(url, enrich=enrich)
+        if "error" in result:
+            print(f"\n{Fore.RED}[!] {result['error']}{Style.RESET_ALL}")
+        elif result["count"] == 0:
+            print(f"\n{Fore.GREEN}[+] No redirects — resolves directly: {result['final']}{Style.RESET_ALL}")
+        else:
+            print(f"\n{Fore.GREEN}[+] Redirect chain ({result['count']} hop(s)):{Style.RESET_ALL}")
+            for i, hop in enumerate(result["hops"], 1):
+                print(f"  {Fore.YELLOW}[Hop {i}]{Style.RESET_ALL} {hop['url']}  [{hop['status_code']}]")
+                if hop.get("location"):
+                    print(f"          {Fore.CYAN}Location: {hop['location']}{Style.RESET_ALL}")
+            print(f"  {Fore.GREEN}[Final]  {result['final']}{Style.RESET_ALL}")
+        flags = result.get("flags", {})
+        if flags.get("too_many_redirects"):
+            print(f"\n  {Fore.RED}[!] WARNING: Too many redirects (>5){Style.RESET_ALL}")
+        if flags.get("https_downgrade"):
+            print(f"  {Fore.RED}[!] WARNING: HTTPS → HTTP downgrade detected{Style.RESET_ALL}")
+        if flags.get("known_shorteners"):
+            print(f"  {Fore.YELLOW}[!] Known shorteners detected: {', '.join(flags['known_shorteners'])}{Style.RESET_ALL}")
+        if enrich and "enrichment" in result:
+            print(f"\n{Fore.CYAN}[*] Domain Enrichment:{Style.RESET_ALL}")
+            for domain, info in result["enrichment"].items():
+                print(f"\n  {Fore.YELLOW}{domain}{Style.RESET_ALL}")
+                print(f"    IP      : {info.get('ip') or 'N/A'}")
+                w = info.get("whois") or {}
+                if w and "error" not in w:
+                    if w.get("registrar"): print(f"    Registrar: {w['registrar']}")
+                    if w.get("creation_date"): print(f"    Created : {w['creation_date']}")
+                    if w.get("country"): print(f"    Country : {w['country']}")
+                vt = info.get("virustotal") or {}
+                if vt and "error" not in vt:
+                    print(f"    VT      : {vt.get('malicious', 0)} malicious / {vt.get('total', 0)} total")
     elif choice == "7":
         print("Paste text (enter a blank line when done):")
         lines = []
